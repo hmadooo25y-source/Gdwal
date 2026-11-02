@@ -1,0 +1,92 @@
+name: Build APK (from zip)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unzip project source
+        run: |
+          test -f prayer_planner_src.zip || { echo "ملف prayer_planner_src.zip غير موجود في جذر المستودع"; exit 1; }
+          unzip -o prayer_planner_src.zip -d src
+          ls -R src
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android project shell
+        run: flutter create --platforms=android --project-name prayer_planner --org com.example app
+
+      - name: Copy source into the project
+        run: |
+          rm -rf app/lib app/pubspec.yaml
+          cp -r src/lib app/lib
+          cp src/pubspec.yaml app/pubspec.yaml
+
+      - name: Add Android permissions
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          manifest = pathlib.Path('app/android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text(encoding='utf-8')
+          perms = (
+              '\n    <uses-permission android:name="android.permission.INTERNET"/>'
+              '\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>'
+              '\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>'
+          )
+          text = re.sub(r'(<manifest[^>]*>)', lambda m: m.group(1) + perms, text, count=1)
+          manifest.write_text(text, encoding='utf-8')
+          print('Permissions added')
+          EOF
+
+      - name: Enable core library desugaring (needed for notifications)
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          base = pathlib.Path('app/android/app')
+          kts = base / 'build.gradle.kts'
+          is_kts = kts.exists()
+          f = kts if is_kts else base / 'build.gradle'
+          text = f.read_text(encoding='utf-8')
+
+          flag = ('isCoreLibraryDesugaringEnabled = true' if is_kts
+                  else 'coreLibraryDesugaringEnabled true')
+          text = re.sub(r'(compileOptions\s*\{)',
+                        lambda m: m.group(1) + '\n        ' + flag,
+                        text, count=1)
+
+          dep = ('coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")'
+                 if is_kts else
+                 "coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'")
+          text += '\n\ndependencies {\n    ' + dep + '\n}\n'
+
+          f.write_text(text, encoding='utf-8')
+          print('Desugaring enabled in', f)
+          EOF
+
+      - name: Build release APK
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: prayer-planner-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
