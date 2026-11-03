@@ -72,6 +72,39 @@ jobs:
           print('compileSdk set to 36 in', f)
           EOF
 
+      - name: Force all plugins to compileSdk 36
+        run: |
+          python3 - <<'EOF'
+          import pathlib
+          base = pathlib.Path('app/android')
+          kts = base / 'build.gradle.kts'
+          is_kts = kts.exists()
+          f = kts if is_kts else base / 'build.gradle'
+          text = f.read_text(encoding='utf-8')
+          if is_kts:
+              block = '''
+          subprojects {
+              afterEvaluate {
+                  if (hasProperty("android")) {
+                      (extensions.getByName("android") as com.android.build.gradle.BaseExtension).compileSdkVersion(36)
+                  }
+              }
+          }
+          '''
+          else:
+              block = '''
+          subprojects {
+              afterEvaluate { p ->
+                  if (p.hasProperty('android')) {
+                      p.android.compileSdkVersion 36
+                  }
+              }
+          }
+          '''
+          f.write_text(text + block, encoding='utf-8')
+          print('Plugin compileSdk override added to', f)
+          EOF
+
       - name: Add Android permissions
         run: |
           python3 - <<'EOF'
