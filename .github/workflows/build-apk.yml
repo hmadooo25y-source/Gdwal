@@ -55,6 +55,23 @@ jobs:
           mkdir -p app/android/app/src/main/res/raw
           cp src/sounds/adhan.mp3 app/android/app/src/main/res/raw/adhan.mp3
 
+      - name: Raise compileSdk to 36 (required by plugins)
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          base = pathlib.Path('app/android/app')
+          kts = base / 'build.gradle.kts'
+          is_kts = kts.exists()
+          f = kts if is_kts else base / 'build.gradle'
+          text = f.read_text(encoding='utf-8')
+          if is_kts:
+              text = re.sub(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', text)
+          else:
+              text = re.sub(r'compileSdk(\s+|\s*=\s*)[^\n]+', 'compileSdk 36', text)
+          f.write_text(text, encoding='utf-8')
+          print('compileSdk set to 36 in', f)
+          EOF
+
       - name: Add Android permissions
         run: |
           python3 - <<'EOF'
