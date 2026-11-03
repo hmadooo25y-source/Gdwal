@@ -121,6 +121,23 @@ jobs:
           print('Desugaring enabled in', f)
           EOF
 
+      - name: Pre-install Android NDK (with retries)
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          NDK=28.2.13676358
+          rm -rf "$HOME/.android/cache" "$ANDROID_HOME/ndk/$NDK"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          for i in 1 2 3; do
+            if "$SDKMANAGER" "ndk;$NDK"; then
+              echo "NDK installed"
+              exit 0
+            fi
+            echo "NDK download failed, retry $i of 3"
+            rm -rf "$HOME/.android/cache" "$ANDROID_HOME/ndk/$NDK"
+            sleep 30
+          done
+          exit 1
+
       - name: Build release APK
         working-directory: app
         env:
