@@ -84,19 +84,21 @@ jobs:
           if is_kts:
               block = '''
           subprojects {
-              plugins.withId("com.android.library") {
-                  extensions.configure<com.android.build.gradle.LibraryExtension> {
-                      compileSdk = 36
+              if (name != "app") {
+                  afterEvaluate {
+                      extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)?.compileSdk = 36
                   }
               }
           }
           '''
           else:
               block = '''
-          subprojects {
-              plugins.withId('com.android.library') {
-                  android {
-                      compileSdk 36
+          subprojects { p ->
+              if (p.name != 'app') {
+                  p.afterEvaluate {
+                      if (p.hasProperty('android')) {
+                          p.android.compileSdkVersion 36
+                      }
                   }
               }
           }
