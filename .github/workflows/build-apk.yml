@@ -84,9 +84,9 @@ jobs:
           if is_kts:
               block = '''
           subprojects {
-              afterEvaluate {
-                  if (hasProperty("android")) {
-                      (extensions.getByName("android") as com.android.build.gradle.BaseExtension).compileSdkVersion(36)
+              plugins.withId("com.android.library") {
+                  extensions.configure<com.android.build.gradle.LibraryExtension> {
+                      compileSdk = 36
                   }
               }
           }
@@ -94,9 +94,9 @@ jobs:
           else:
               block = '''
           subprojects {
-              afterEvaluate { p ->
-                  if (p.hasProperty('android')) {
-                      p.android.compileSdkVersion 36
+              plugins.withId('com.android.library') {
+                  android {
+                      compileSdk 36
                   }
               }
           }
